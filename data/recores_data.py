@@ -93,7 +93,6 @@ class RecoresData:
             "SPACE",
             "OPTION",
             "SEP",
-            "REASON",
             "SPACE",
             "CONTEXT",
         ]
