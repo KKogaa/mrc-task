@@ -26,8 +26,6 @@ class BERT(pl.LightningModule):
 
         self.positives = 0
         self.negatives = 0
-        self.preds = []
-        self.targets = []
 
     def forward(self, input_ids, attention_mask, labels=None):
         bert_output = self.bert(input_ids, attention_mask=attention_mask)
@@ -87,26 +85,25 @@ class BERT(pl.LightningModule):
         )
 
         prob = torch.sigmoid(outputs)
-        self.preds.append(prob.flatten())
-        self.targets.append(labels.int())
+        output = {"loss": loss, "prob": prob.flatten(), "target": labels.int()}
 
-        max_prediction = torch.argmax(prob.flatten())
-        max_label = torch.argmax(labels)
+        return output
+
+    def test_step_end(self, outputs):
+        predictions = outputs["prob"].detach().cpu()
+        targets = outputs["target"].detach().cpu()
+
+        max_prediction = torch.argmax(predictions.flatten())
+        max_label = torch.argmax(targets)
 
         if torch.equal(max_prediction, max_label):
             self.positives = self.positives + 1
         else:
             self.negatives = self.negatives + 1
 
-        return loss
-
     def test_epoch_end(self, outputs):
-
         accuracy = self.positives / (self.positives + self.negatives)
-        self.log("test_accuracy_epoch", accuracy)
-
-        predictions = torch.stack(self.preds)  # .detach().cpu()
-        labels = torch.stack(self.targets)  # .detach().cpu()
+        self.log(f"test_accuracy_epoch", accuracy)
 
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.learning_rate)
