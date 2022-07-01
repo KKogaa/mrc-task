@@ -15,6 +15,7 @@ from model.model import BERT
 def train(
     project,
     entity,
+    name,
     max_token_count,
     tokenizer,
     model_name,
@@ -24,7 +25,7 @@ def train(
     config={"learning_rate": 1e-5, "batch_size": 16, "epochs": 10},
 ):
     with wandb.init(
-        project=project, entity=entity, job_type="train", config=config
+        project=project, entity=entity, job_type="train", config=config, name=name
     ) as run:
 
         # Extract the config object associated with the run
@@ -99,11 +100,13 @@ if __name__ == "__main__":
 
     # train model
     project = "mrc_test"
-    entity = "test_entity"
+    entity = None
+    name = "test"
     config = {"learning_rate": 1e-5, "batch_size": 16, "epochs": 10}
     train(
         project=project,
         entity=entity,
+        name=name,
         max_token_count=512,
         tokenizer=tokenizer,
         model_name=model_name,
