@@ -38,7 +38,7 @@ def train(
         )
 
         # This logger is used when we call self.log inside the LightningModule
-        name_string = f"{config.batch_size}-{config.learning_rate}"
+        # name_string = f"{config.batch_size}-{config.learning_rate}"
         logger = pl.loggers.WandbLogger(experiment=run, log_model=True)
 
         # build data module
@@ -81,9 +81,7 @@ def train(
 
 
 if __name__ == "__main__":
-    print(np.__version__)
 
-    # get data
     dataset = RecoresData(
         sep="\t",
         train="train_spanish.csv",
@@ -101,7 +99,7 @@ if __name__ == "__main__":
 
     # train model
     project = "mrc_test"
-    entity = None
+    entity = "test_entity"
     config = {"learning_rate": 1e-5, "batch_size": 16, "epochs": 10}
     train(
         project=project,

@@ -45,7 +45,12 @@ class RecoresData:
 
         return text
 
-    def convert_dataframe(self, df: pd.DataFrame, type=None):
+    def convert_dataframe(
+        self,
+        df: pd.DataFrame,
+        format,
+        type=None,
+    ):
         options = ["A", "B", "C", "D", "E"]
         df_list = []
         for index, row in df.iterrows():
@@ -53,39 +58,12 @@ class RecoresData:
 
                 text = None
                 if type == "TRAIN":
-                    format = [
-                        "QUESTION",
-                        "SPACE",
-                        "OPTION",
-                        "SEP",
-                        "REASON",
-                        "SPACE",
-                        "CONTEXT",
-                    ]
                     text = self.concatenate_data(row, format, option)
 
                 if type == "VAL":
-                    format = [
-                        "QUESTION",
-                        "SPACE",
-                        "OPTION",
-                        "SEP",
-                        "REASON",
-                        "SPACE",
-                        "CONTEXT",
-                    ]
                     text = self.concatenate_data(row, format, option)
 
                 if type == "TEST":
-                    format = [
-                        "QUESTION",
-                        "SPACE",
-                        "OPTION",
-                        "SEP",
-                        "REASON",
-                        "SPACE",
-                        "CONTEXT",
-                    ]
                     text = self.concatenate_data(row, format, option)
 
                 data = {
@@ -110,9 +88,28 @@ class RecoresData:
         self.df_val.rename(columns={"text": "context"}, inplace=True)
         self.df_test.rename(columns={"text": "context"}, inplace=True)
 
-        self.df_train = self.convert_dataframe(self.df_train, "TRAIN")
-        self.df_val = self.convert_dataframe(self.df_val, "VAL")
-        self.df_test = self.convert_dataframe(self.df_test, "TEST")
+        format = [
+            "QUESTION",
+            "SPACE",
+            "OPTION",
+            "SEP",
+            "REASON",
+            "SPACE",
+            "CONTEXT",
+        ]
+        self.df_train = self.convert_dataframe(self.df_train, format, "TRAIN")
+
+        self.df_val = self.convert_dataframe(self.df_val, format, "VAL")
+
+        format = [
+            "QUESTION",
+            "SPACE",
+            "OPTION",
+            "SEP",
+            "SPACE",
+            "CONTEXT",
+        ]
+        self.df_test = self.convert_dataframe(self.df_test, format, "TEST")
 
     def get_dataframes(self):
         return (self.df_train, self.df_val, self.df_test)
