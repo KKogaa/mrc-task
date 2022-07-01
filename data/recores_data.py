@@ -4,9 +4,9 @@ import pandas as pd
 class RecoresData:
     def __init__(self, *args, **kwargs):
         self.separator = kwargs["sep"]
-        self.df_train = pd.read_csv(kwargs["train"], sep=self.separator)
-        self.df_val = pd.read_csv(kwargs["val"], sep=self.separator)
-        self.df_test = pd.read_csv(kwargs["test"], sep=self.separator)
+        self.df_train = pd.read_csv("data/" + kwargs["train"], sep=self.separator)
+        self.df_val = pd.read_csv("data/" + kwargs["val"], sep=self.separator)
+        self.df_test = pd.read_csv("data/" + kwargs["test"], sep=self.separator)
 
     def concatenate_data(self, row, format, option):
         """
@@ -106,9 +106,13 @@ class RecoresData:
         return pd.DataFrame(df_list)
 
     def setup(self):
+        self.df_train.rename(columns={"text": "context"}, inplace=True)
+        self.df_val.rename(columns={"text": "context"}, inplace=True)
+        self.df_test.rename(columns={"text": "context"}, inplace=True)
+
         self.df_train = self.convert_dataframe(self.df_train, "TRAIN")
         self.df_val = self.convert_dataframe(self.df_val, "VAL")
-        self.df_test = self.convert_dataframe(self.df_val, "TEST")
+        self.df_test = self.convert_dataframe(self.df_test, "TEST")
 
     def get_dataframes(self):
         return (self.df_train, self.df_val, self.df_test)

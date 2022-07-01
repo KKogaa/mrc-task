@@ -89,7 +89,9 @@ if __name__ == "__main__":
         train="train_spanish.csv",
         val="dev_spanish.csv",
         test="test_spanish.csv",
-    ).setup()
+    )
+
+    dataset.setup()
 
     (df_train, df_val, df_test) = dataset.get_dataframes()
 
