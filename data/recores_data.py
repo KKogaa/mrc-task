@@ -4,9 +4,9 @@ import pandas as pd
 class RecoresData:
     def __init__(self, *args, **kwargs):
         self.separator = kwargs["sep"]
-        self.df_train = pd.DataFrame(kwargs["train"], self.separator)
-        self.df_val = pd.DataFrame(kwargs["val"], self.separator)
-        self.df_test = pd.DataFrame(kwargs["test"], self.separator)
+        self.df_train = pd.DataFrame(kwargs["train"], sep=self.separator)
+        self.df_val = pd.DataFrame(kwargs["val"], sep=self.separator)
+        self.df_test = pd.DataFrame(kwargs["test"], sep=self.separator)
 
     def concatenate_data(self, row, format, option):
         """
