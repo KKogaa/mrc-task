@@ -2,6 +2,7 @@ import pytorch_lightning as pl
 import wandb
 import torch
 import numpy as np
+from data.recores_data import RecoresData
 
 
 def train(
