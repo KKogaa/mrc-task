@@ -109,5 +109,8 @@ if __name__ == "__main__":
         max_token_count=512,
         tokenizer=tokenizer,
         model_name=model_name,
+        df_train=df_train,
+        df_val=df_val,
+        df_test=df_test,
         config=config,
     )
