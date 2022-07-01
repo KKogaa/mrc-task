@@ -3,10 +3,10 @@ import pandas as pd
 
 class RecoresData:
     def __init__(self, *args, **kwargs):
-        separator = kwargs["sep"]
-        df_train = pd.DataFrame(kwargs["train"], separator)
-        df_val = pd.DataFrame(kwargs["val"], separator)
-        df_test = pd.DataFrame(kwargs["test"], separator)
+        self.separator = kwargs["sep"]
+        self.df_train = pd.DataFrame(kwargs["train"], self.separator)
+        self.df_val = pd.DataFrame(kwargs["val"], self.separator)
+        self.df_test = pd.DataFrame(kwargs["test"], self.separator)
 
     def concatenate_data(self, row, format, option):
         """
@@ -109,3 +109,6 @@ class RecoresData:
         self.df_train = self.convert_dataframe(self.df_train, "TRAIN")
         self.df_val = self.convert_dataframe(self.df_val, "VAL")
         self.df_test = self.convert_dataframe(self.df_val, "TEST")
+
+    def get_dataframes(self):
+        return (self.df_train, self.df_val, self.df_test)
