@@ -144,3 +144,4 @@ lightning_logs/
 
 .DS_Store
 test/*
+mrc_test/*
