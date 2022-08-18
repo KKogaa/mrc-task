@@ -10,7 +10,8 @@ from model.Test import TEST
 
 if __name__ == "__main__":
 
-    model_name = "bert-base-uncased"
+    # model_name = "bert-base-uncased"
+    model_name = "distilbert-base-uncased"
     dataset_name = "race"
     task_name = "all"
 
@@ -18,7 +19,7 @@ if __name__ == "__main__":
         model_name=model_name,
         dataset_name=dataset_name,
         task_name=task_name,
-        batch_size=16,
+        batch_size=4,
         max_seq_len=512,
         num_workers=4,
         num_proc=8,
@@ -30,7 +31,7 @@ if __name__ == "__main__":
 
     model = TEST(
         learning_rate=5e-5,
-        batch_size=16,
+        batch_size=4,
         model_name=model_name,
     )
 
