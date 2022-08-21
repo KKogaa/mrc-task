@@ -1,3 +1,4 @@
+
 import pytorch_lightning as pl
 import torch
 import numpy as np
@@ -6,7 +7,7 @@ from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 from transformers import BertTokenizerFast as BertTokenizer
-from data.RaceDataModule import RaceDataModule
+from data.QuailDataModule import QuailDataModule
 from model.Test import TEST
 
 
@@ -39,7 +40,7 @@ def train(
         logger = pl.loggers.WandbLogger(experiment=run, log_model=True)
 
         # build data module
-        data_module = RaceDataModule(
+        data_module = QuailDataModule(
             model_name=model_name,
             dataset_name=dataset_name,
             task_name=task_name,
@@ -58,7 +59,7 @@ def train(
         trainer = pl.Trainer(
             callbacks=[early_stopping_callback, checkpoint_callback],
             max_epochs=config.epochs,
-            gpus=4,
+            gpus=[1, 2, 3],
             strategy="dp",
             logger=logger,
         )
@@ -68,12 +69,6 @@ def train(
 
         # load best model
         trainer.test(model=model, datamodule=data_module, ckpt_path="best")
-
-        # "/drive/MyDrive/qa_datasets_spanish/spanish_mcqa_v1/4ford7jt/checkpoints/epoch=7-step=2615.ckpt"
-        # model = BERT.load_from_checkpoint(
-        #     "/drive/MyDrive/qa_datasets_spanish/spanish_mcqa_v1/4ford7jt/checkpoints/epoch=7-step=2615.ckpt",
-        #     learning_rate=1e-5,
-        # )
 
         torch.cuda.empty_cache()
 
@@ -98,7 +93,7 @@ def test(
 
         # Construct our LightningModule with the learning rate from the config object
         model = TEST.load_from_checkpoint(
-            "/home/akenichi/mrc-task/mrc_test/1w0ilwbf/checkpoints/epoch=2-step=981.ckpt",
+            "/home/akenichi/mrc-task/quail_test/3f2i4mdl/checkpoints/epoch=2-step=3840.ckpt",
             learning_rate=1e-5,
         )
 
@@ -107,7 +102,7 @@ def test(
         logger = pl.loggers.WandbLogger(experiment=run, log_model=True)
 
         # build data module
-        data_module = RaceDataModule(
+        data_module = QuailDataModule(
             model_name=model_name,
             dataset_name=dataset_name,
             task_name=task_name,
@@ -142,19 +137,17 @@ def test(
 
 if __name__ == "__main__":
 
-    project = "race_test_4"
+    project = "quail_test"
     entity = None
-    learning_rate=1e-5
-    batch_size=8
-    name = f"test-lr-{learning_rate}-bs-{batch_size}"
-    config = {"learning_rate": learning_rate, "batch_size": batch_size, "epochs": 5}
-    train(
+    name = "test"
+    config = {"learning_rate": 1e-5, "batch_size": 8, "epochs": 5}
+    test(
         project=project,
         entity=entity,
         name=name,
         max_token_count=512,
         model_name="roberta-base",
-        dataset_name="race",
-        task_name="all",
+        dataset_name="quail",
+        task_name=None,
         config=config,
     )

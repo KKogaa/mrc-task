@@ -145,3 +145,7 @@ lightning_logs/
 .DS_Store
 test/*
 mrc_test/*
+quail_test/*
+race_test/*
+race_test_2/*
+

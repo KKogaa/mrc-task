@@ -8,7 +8,7 @@ import datasets
 from transformers import AutoTokenizer
     
 
-class RaceDataModule(pl.LightningDataModule):
+class QuailDataModule(pl.LightningDataModule):
     def __init__(
         self,
         model_name,
@@ -33,13 +33,13 @@ class RaceDataModule(pl.LightningDataModule):
 
     @staticmethod
     def preprocess(tokenizer, max_seq_len, examples):
-        choices_features = []
-        label_map = {"A": 0, "B": 1, "C": 2, "D": 3}
+        # choices_features = []
+        # label_map = {"A": 0, "B": 1, "C": 2, "D": 3}
 
-        context = [[article] * 4 for article in examples["article"]]
+        context = [[article] * 4 for article in examples["context"]]
         question_option = [
             [f"{question} {option}" for option in options]
-            for options, question in zip(examples["options"], examples["question"])
+            for options, question in zip(examples["answers"], examples["question"])
         ]
 
         context = sum(context, [])
@@ -70,7 +70,8 @@ class RaceDataModule(pl.LightningDataModule):
         )
         # shape after (1000, 2048)
 
-        labels = [label_map.get(answer, -1) for answer in examples["answer"]]
+        # labels = [label_map.get(answer, -1) for answer in examples["answer"]]
+        labels = [answer for answer in examples["correct_answer_id"]]
 
         return {
             "input_ids": encoding["input_ids"].tolist(),
@@ -93,10 +94,9 @@ class RaceDataModule(pl.LightningDataModule):
         # preprocess
         preprocessor = partial(self.preprocess, self.tokenizer, self.max_seq_len)
 
-        for split in ["train", "validation", "test"]:
+        for split in ["train", "validation", "challenge"]:
             self.dataset[split] = self.dataset[split].map(
                 preprocessor,
-                remove_columns=["example_id"],
                 num_proc=self.num_proc,
                 batched=True,
             )
@@ -124,7 +124,7 @@ class RaceDataModule(pl.LightningDataModule):
 
     def test_dataloader(self):
         return DataLoader(
-            self.dataset["test"],
+            self.dataset["challenge"],
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             drop_last=True,
