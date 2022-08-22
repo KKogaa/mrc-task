@@ -21,6 +21,7 @@ class TEST(pl.LightningModule):
 
         self.learning_rate = kwargs["learning_rate"]
         self.batch_size = kwargs["batch_size"]
+        self.num_choices = kwargs["num_choices"]
         self.criterion = nn.CrossEntropyLoss()
 
         self.save_hyperparameters()
@@ -32,7 +33,7 @@ class TEST(pl.LightningModule):
         bert_output = self.bert(input_ids, attention_mask=attention_mask)
         x = bert_output.pooler_output
         logits = self.fc1(x)
-        reshaped_logits = logits.view(-1, 4) 
+        reshaped_logits = logits.view(-1, self.num_choices) 
         loss = 0
         if labels is not None:
             loss = self.criterion(reshaped_logits, labels)
@@ -40,8 +41,8 @@ class TEST(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         #unflatten inputids and attention mask (batch_size, 2048) -> (batch_size * 4, 512)
-        input_ids = batch["input_ids"].view(batch["input_ids"].shape[0] * 4, -1)
-        attention_mask = batch["attention_mask"].view(batch["attention_mask"].shape[0] * 4, -1)
+        input_ids = batch["input_ids"].view(batch["input_ids"].shape[0] * self.num_choices, -1)
+        attention_mask = batch["attention_mask"].view(batch["attention_mask"].shape[0] * self.num_choices, -1)
         labels = batch["label"]
 
         loss, logits = self(input_ids, attention_mask, labels)
@@ -63,8 +64,8 @@ class TEST(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        input_ids = batch["input_ids"].view(batch["input_ids"].shape[0] * 4, -1)
-        attention_mask = batch["attention_mask"].view(batch["attention_mask"].shape[0] * 4, -1)
+        input_ids = batch["input_ids"].view(batch["input_ids"].shape[0] * self.num_choices, -1)
+        attention_mask = batch["attention_mask"].view(batch["attention_mask"].shape[0] * self.num_choices, -1)
         labels = batch["label"]
 
         loss, logits = self(input_ids, attention_mask, labels)
@@ -91,8 +92,8 @@ class TEST(pl.LightningModule):
 
 
     def test_step(self, batch, batch_idx):
-        input_ids = batch["input_ids"].view(batch["input_ids"].shape[0] * 4, -1)
-        attention_mask = batch["attention_mask"].view(batch["attention_mask"].shape[0] * 4, -1)
+        input_ids = batch["input_ids"].view(batch["input_ids"].shape[0] * self.num_choices, -1)
+        attention_mask = batch["attention_mask"].view(batch["attention_mask"].shape[0] * self.num_choices, -1)
         labels = batch["label"]
 
         loss, logits = self(input_ids, attention_mask, labels)
