@@ -78,7 +78,6 @@ def train(
         torch.cuda.empty_cache()
 
 
-
 def test(
     project,
     entity,
@@ -87,6 +86,7 @@ def test(
     model_name,
     dataset_name,
     task_name,
+    num_choices,
     config={"learning_rate": 1e-5, "batch_size": 16, "epochs": 10},
 ):
     with wandb.init(
@@ -98,8 +98,9 @@ def test(
 
         # Construct our LightningModule with the learning rate from the config object
         model = TEST.load_from_checkpoint(
-            "/home/akenichi/mrc-task/mrc_test/1w0ilwbf/checkpoints/epoch=2-step=981.ckpt",
-            learning_rate=1e-5,
+            "/home/akenichi/mrc-task/quail_test/3f2i4mdl/checkpoints/epoch=2-step=3840.ckpt",
+            learning_rate=config.learning_rate,
+            num_choices=num_choices,
         )
 
         # This logger is used when we call self.log inside the LightningModule
@@ -139,16 +140,15 @@ def test(
         torch.cuda.empty_cache()
 
 
-
 if __name__ == "__main__":
 
     project = "race_test_4"
     entity = None
-    learning_rate=1e-5
-    batch_size=8
+    learning_rate = 1e-5
+    batch_size = 8
     name = f"test-lr-{learning_rate}-bs-{batch_size}"
     config = {"learning_rate": learning_rate, "batch_size": batch_size, "epochs": 5}
-    train(
+    test(
         project=project,
         entity=entity,
         name=name,
@@ -156,5 +156,6 @@ if __name__ == "__main__":
         model_name="roberta-base",
         dataset_name="race",
         task_name="all",
+        num_choices=4,
         config=config,
     )

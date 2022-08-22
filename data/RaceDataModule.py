@@ -6,7 +6,7 @@ from transformers import BertTokenizerFast
 from functools import partial
 import datasets
 from transformers import AutoTokenizer
-    
+
 
 class RaceDataModule(pl.LightningDataModule):
     def __init__(

@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -33,16 +32,20 @@ class TEST(pl.LightningModule):
         bert_output = self.bert(input_ids, attention_mask=attention_mask)
         x = bert_output.pooler_output
         logits = self.fc1(x)
-        reshaped_logits = logits.view(-1, self.num_choices) 
+        reshaped_logits = logits.view(-1, self.num_choices)
         loss = 0
         if labels is not None:
             loss = self.criterion(reshaped_logits, labels)
         return loss, reshaped_logits
 
     def training_step(self, batch, batch_idx):
-        #unflatten inputids and attention mask (batch_size, 2048) -> (batch_size * 4, 512)
-        input_ids = batch["input_ids"].view(batch["input_ids"].shape[0] * self.num_choices, -1)
-        attention_mask = batch["attention_mask"].view(batch["attention_mask"].shape[0] * self.num_choices, -1)
+        # unflatten inputids and attention mask (batch_size, 2048) -> (batch_size * 4, 512)
+        input_ids = batch["input_ids"].view(
+            batch["input_ids"].shape[0] * self.num_choices, -1
+        )
+        attention_mask = batch["attention_mask"].view(
+            batch["attention_mask"].shape[0] * self.num_choices, -1
+        )
         labels = batch["label"]
 
         loss, logits = self(input_ids, attention_mask, labels)
@@ -57,15 +60,19 @@ class TEST(pl.LightningModule):
             batch_size=self.batch_size,
         )
 
-        probs = F.softmax(logits, dim = 1)
+        probs = F.softmax(logits, dim=1)
         labels_hat = torch.argmax(probs, dim=1)
-        correct_count = torch.sum(labels == labels_hat)        
-        
+        correct_count = torch.sum(labels == labels_hat)
+
         return loss
 
     def validation_step(self, batch, batch_idx):
-        input_ids = batch["input_ids"].view(batch["input_ids"].shape[0] * self.num_choices, -1)
-        attention_mask = batch["attention_mask"].view(batch["attention_mask"].shape[0] * self.num_choices, -1)
+        input_ids = batch["input_ids"].view(
+            batch["input_ids"].shape[0] * self.num_choices, -1
+        )
+        attention_mask = batch["attention_mask"].view(
+            batch["attention_mask"].shape[0] * self.num_choices, -1
+        )
         labels = batch["label"]
 
         loss, logits = self(input_ids, attention_mask, labels)
@@ -80,20 +87,23 @@ class TEST(pl.LightningModule):
             batch_size=self.batch_size,
         )
 
-        probs = F.softmax(logits, dim = 1)
+        probs = F.softmax(logits, dim=1)
         labels_hat = torch.argmax(probs, dim=1)
-        correct_count = torch.sum(labels == labels_hat)        
-        
+        correct_count = torch.sum(labels == labels_hat)
+
         return {
             "val_loss": loss,
             "correct_count": correct_count,
-            "batch_size": len(batch["label"])
+            "batch_size": len(batch["label"]),
         }
 
-
     def test_step(self, batch, batch_idx):
-        input_ids = batch["input_ids"].view(batch["input_ids"].shape[0] * self.num_choices, -1)
-        attention_mask = batch["attention_mask"].view(batch["attention_mask"].shape[0] * self.num_choices, -1)
+        input_ids = batch["input_ids"].view(
+            batch["input_ids"].shape[0] * self.num_choices, -1
+        )
+        attention_mask = batch["attention_mask"].view(
+            batch["attention_mask"].shape[0] * self.num_choices, -1
+        )
         labels = batch["label"]
 
         loss, logits = self(input_ids, attention_mask, labels)
@@ -108,22 +118,26 @@ class TEST(pl.LightningModule):
             batch_size=self.batch_size,
         )
 
-        probs = F.softmax(logits, dim = 1)
+        probs = F.softmax(logits, dim=1)
         labels_hat = torch.argmax(probs, dim=1)
-        correct_count = torch.sum(labels == labels_hat)        
-        
+        correct_count = torch.sum(labels == labels_hat)
+
         return {
             "test_loss": loss,
             "correct_count": correct_count,
-            "batch_size": len(batch["label"])
+            "batch_size": len(batch["label"]),
         }
 
     def validation_epoch_end(self, outputs):
-        val_acc = sum([out["correct_count"] for out in outputs]).float() / sum(out["batch_size"] for out in outputs) 
+        val_acc = sum([out["correct_count"] for out in outputs]).float() / sum(
+            out["batch_size"] for out in outputs
+        )
         self.log(f"val_accuracy_epoch", val_acc)
 
     def test_epoch_end(self, outputs):
-        test_acc = sum([out["correct_count"] for out in outputs]).float() / sum(out["batch_size"] for out in outputs) 
+        test_acc = sum([out["correct_count"] for out in outputs]).float() / sum(
+            out["batch_size"] for out in outputs
+        )
         self.log(f"test_accuracy_epoch", test_acc)
 
     def configure_optimizers(self):

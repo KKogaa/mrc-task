@@ -72,7 +72,6 @@ def train(
         torch.cuda.empty_cache()
 
 
-
 def test(
     project,
     entity,
@@ -131,7 +130,6 @@ def test(
         trainer.test(model=model, datamodule=data_module)
 
         torch.cuda.empty_cache()
-
 
 
 if __name__ == "__main__":

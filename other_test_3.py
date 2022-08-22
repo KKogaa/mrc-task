@@ -12,18 +12,10 @@ from model.Test import TEST
 
 
 def train(
-    project,
-    entity,
-    name,
-    max_token_count,
-    model_name,
-    dataset_name,
-    task_name,
-    num_choices,
     config={"learning_rate": 1e-5, "batch_size": 16, "epochs": 10},
 ):
     with wandb.init(
-        project=project, entity=entity, job_type="train", config=config, name=name
+        project=project, entity=entity, job_type="train", config=config
     ) as run:
 
         # Extract the config object associated with the run
@@ -33,9 +25,15 @@ def train(
         model = TEST(
             learning_rate=config.learning_rate,
             batch_size=config.batch_size,
-            model_name=model_name,
-            num_choices=num_choices,
+            model_name=config.model_name,
+            num_choices=config.num_choices,
         )
+        # model = TEST.load_from_checkpoint(
+        #     "/home/akenichi/mrc-task/quail_test/3f2i4mdl/checkpoints/epoch=2-step=3840.ckpt",
+        #     learning_rate=config.learning_rate,
+        #     model_name=model_name,
+        #     num_choices=num_choices,
+        # )
 
         # This logger is used when we call self.log inside the LightningModule
         # name_string = f"{config.batch_size}-{config.learning_rate}"
@@ -46,11 +44,11 @@ def train(
         df_val = pd.read_csv("data/dev_spanish.csv", sep="\t")
         df_test = pd.read_csv("data/test_spanish.csv", sep="\t")
         data_module = RecoresDataModule(
-            model_name=model_name,
-            dataset_name=dataset_name,
-            task_name=task_name,
+            model_name=config.model_name,
+            dataset_name=config.dataset_name,
+            task_name=config.task_name,
             batch_size=config.batch_size,
-            max_seq_len=max_token_count,
+            max_seq_len=config.max_token_count,
             num_workers=4,
             num_proc=8,
             df_train=df_train,
@@ -75,11 +73,41 @@ def train(
         # Execute training
         trainer.fit(model, data_module)
 
-        # load best model
-        trainer.test(model=model, datamodule=data_module, ckpt_path="best")
-
         torch.cuda.empty_cache()
 
+        best_path = trainer.checkpoint_callback.best_model_path
+
+        data_module = RecoresDataModule(
+            model_name=config.model_name,
+            dataset_name=config.dataset_name,
+            task_name=config.task_name,
+            batch_size=config.batch_size,
+            max_seq_len=config.max_token_count,
+            num_workers=4,
+            num_proc=8,
+            df_train=df_train,
+            df_val=df_val,
+            df_test=df_test,
+        )
+
+        model = TEST.load_from_checkpoint(
+            best_path,
+            learning_rate=config.learning_rate,
+            num_choices=config.num_choices,
+        )
+        trainer = pl.Trainer(
+            callbacks=[early_stopping_callback, checkpoint_callback],
+            max_epochs=config.epochs,
+            gpus=[1, 2, 3],
+            strategy="dp",
+            logger=logger,
+        )
+
+        # load best model
+        trainer.test(model=model, datamodule=data_module)
+        # trainer.test(model=model, datamodule=data_module, ckpt_path="/home/akenichi/mrc-task/recores/2m9lxabk/checkpoints/epoch=0-step=261.ckpt")
+
+        torch.cuda.empty_cache()
 
 
 def test(
@@ -102,9 +130,9 @@ def test(
 
         # Construct our LightningModule with the learning rate from the config object
         model = TEST.load_from_checkpoint(
-            "/home/akenichi/mrc-task/recores_test/qxdilsep/checkpoints/epoch=1-step=522.ckpt",
+            "/home/akenichi/mrc-task/recores_test/2g5295sn/checkpoints/epoch=1-step=522.ckpt",
             learning_rate=1e-5,
-            num_choices=num_choices
+            num_choices=num_choices,
         )
 
         # This logger is used when we call self.log inside the LightningModule
@@ -150,21 +178,44 @@ def test(
         torch.cuda.empty_cache()
 
 
-
 if __name__ == "__main__":
 
-    project = "recores_test"
+    project = "recores_v1"
     entity = None
-    name = "test"
-    config = {"learning_rate": 1e-5, "batch_size": 4, "epochs": 5}
-    test(
+    name = None
+    # config = {"learning_rate": 1e-5, "batch_size": 4, "epochs": 5}
+    # test(
+    #     project=project,
+    #     entity=entity,
+    #     name=name,
+    #     max_token_count=512,
+    #     model_name="roberta-base",
+    #     dataset_name=None,
+    #     task_name=None,
+    #     num_choices=5,
+    #     config=config,
+    # )
+    sweep_config = {
+        "method": "grid",  # Randomly sample the hyperparameter space (alternatives: grid, bayes)
+        "metric": {  # This is the metric we are interested in minimizing or maximizing
+            "name": "test_accuracy_epoch",
+            "goal": "maximize",
+        },
+        # Paramters and parameter values we are sweeping across
+        "parameters": {
+            "learning_rate": {"values": [2e-5]},
+            "batch_size": {"values": [4]},
+            "epochs": {"values": [10]},
+            "max_token_count": {"values": [512]},
+            "model_name": {"values": ["bertin-project/bertin-roberta-base-spanish"]},
+            "dataset_name": {"values": [None]},
+            "task_name": {"values": [None]},
+            "num_choices": {"values": [5]},
+        },
+    }
+    sweep_id = wandb.sweep(
+        sweep_config,
         project=project,
         entity=entity,
-        name=name,
-        max_token_count=512,
-        model_name="roberta-base",
-        dataset_name=None,
-        task_name=None,
-        num_choices=5,
-        config=config,
     )
+    wandb.agent(sweep_id, function=train, count=3)

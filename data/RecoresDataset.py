@@ -1,6 +1,7 @@
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 
+
 class RecoresDataset(Dataset):
     def __init__(self, data, tokenizer, max_token_len):
         self.tokenizer = tokenizer
@@ -16,12 +17,10 @@ class RecoresDataset(Dataset):
         # text to get encoded
         text = data_row.text
         context = data_row.context
-        #create 5 contexts
+        # create 5 contexts
         context = [[] * 5]
-        #create 5 question option pairs
-        question_option = [
-            f"{question} {option}" for option in options
-        ]
+        # create 5 question option pairs
+        question_option = [f"{question} {option}" for option in options]
 
         encoding = self.tokenizer(
             context,
@@ -43,7 +42,6 @@ class RecoresDataset(Dataset):
             attention_mask=encoding["attention_mask"].flatten(),
             label=label,
         )
-
 
     @staticmethod
     def preprocess(tokenizer, max_seq_len, examples):

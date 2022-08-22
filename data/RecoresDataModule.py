@@ -7,7 +7,7 @@ from transformers import BertTokenizerFast
 from functools import partial
 from transformers import AutoTokenizer
 from .RecoresDataset import RecoresDataset
-    
+
 
 class RecoresDataModule(pl.LightningDataModule):
     def __init__(
@@ -36,8 +36,8 @@ class RecoresDataModule(pl.LightningDataModule):
         self.dataset = {
             "train": Dataset.from_pandas(df_train),
             "validation": Dataset.from_pandas(df_val),
-            "test": Dataset.from_pandas(df_test)
-        } 
+            "test": Dataset.from_pandas(df_test),
+        }
 
     @staticmethod
     def preprocess(tokenizer, max_seq_len, examples):
@@ -46,13 +46,19 @@ class RecoresDataModule(pl.LightningDataModule):
 
         context = [[article] * 5 for article in examples["text"]]
         question_option = []
-        for opta, optb, optc, optd, opte, question in zip(examples["A"], examples["B"],examples["C"], examples["D"], examples["E"], examples["question"]):
-            question_option.append(f"{question} {opta}")          
-            question_option.append(f"{question} {optb}")          
-            question_option.append(f"{question} {optc}")          
-            question_option.append(f"{question} {optd}")          
-            question_option.append(f"{question} {opte}")          
-
+        for opta, optb, optc, optd, opte, question in zip(
+            examples["A"],
+            examples["B"],
+            examples["C"],
+            examples["D"],
+            examples["E"],
+            examples["question"],
+        ):
+            question_option.append(f"{question} {opta}")
+            question_option.append(f"{question} {optb}")
+            question_option.append(f"{question} {optc}")
+            question_option.append(f"{question} {optd}")
+            question_option.append(f"{question} {opte}")
 
         context = sum(context, [])
         # question_option = sum(question_option, [])
