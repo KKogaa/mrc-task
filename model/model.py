@@ -6,17 +6,20 @@ from transformers import (
     BertModel,
     AdamW,
     get_linear_schedule_with_warmup,
+    AutoModel,
 )
 
 
 class BERT(pl.LightningModule):
     def __init__(self, *args, **kwargs):
         super().__init__()
-        self.bert = BertModel.from_pretrained(kwargs["model_name"], return_dict=True)
+        # self.bert = BertModel.from_pretrained(kwargs["model_name"], return_dict=True)
+        self.bert = AutoModel.from_pretrained(kwargs["model_name"], return_dict=True)
         self.fc1 = nn.Linear(self.bert.config.hidden_size, 1)
 
         self.learning_rate = kwargs["learning_rate"]
         self.batch_size = kwargs["batch_size"]
+        self.num_choices = kwargs["num_choices"]
         self.criterion = nn.BCEWithLogitsLoss()
 
         self.save_hyperparameters()
@@ -40,7 +43,7 @@ class BERT(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         input_ids = batch["input_ids"]
         attention_mask = batch["attention_mask"]
-        labels = batch["labels"]
+        labels = batch["label"]
         loss, outputs = self(input_ids, attention_mask, labels)
         self.log(
             "train_loss",
@@ -56,7 +59,7 @@ class BERT(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         input_ids = batch["input_ids"]
         attention_mask = batch["attention_mask"]
-        labels = batch["labels"]
+        labels = batch["label"]
         loss, outputs = self(input_ids, attention_mask, labels)
         self.log(
             "val_loss",
@@ -72,7 +75,7 @@ class BERT(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         input_ids = batch["input_ids"]
         attention_mask = batch["attention_mask"]
-        labels = batch["labels"]
+        labels = batch["label"]
         loss, outputs = self(input_ids, attention_mask, labels)
         self.log(
             "test_loss",
@@ -81,7 +84,7 @@ class BERT(pl.LightningModule):
             on_epoch=True,
             prog_bar=True,
             logger=True,
-            batch_size=5,
+            batch_size=self.num_choices,
         )
 
         prob = torch.sigmoid(outputs)

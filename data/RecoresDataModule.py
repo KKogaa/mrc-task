@@ -22,6 +22,8 @@ class RecoresDataModule(pl.LightningDataModule):
         df_train,
         df_val,
         df_test,
+        num_choices,
+        version,
     ):
         super().__init__()
         self.model_name = model_name
@@ -38,6 +40,8 @@ class RecoresDataModule(pl.LightningDataModule):
             "validation": Dataset.from_pandas(df_val),
             "test": Dataset.from_pandas(df_test),
         }
+        self.num_choices = num_choices
+        self.version = version
 
     @staticmethod
     def preprocess(tokenizer, max_seq_len, examples):
@@ -64,8 +68,8 @@ class RecoresDataModule(pl.LightningDataModule):
         # question_option = sum(question_option, [])
 
         encoding = tokenizer(
-            context,
             question_option,
+            context,
             add_special_tokens=True,
             max_length=max_seq_len,
             return_token_type_ids=False,
@@ -97,21 +101,136 @@ class RecoresDataModule(pl.LightningDataModule):
             "label": labels,
         }
 
+    @staticmethod
+    def preprocess_binary(tokenizer, max_seq_len, examples):
+
+        label_map = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4}
+
+        context = [article for article in examples["text"]]
+        question_option = [
+            f"{question} {option}"
+            for option, question in zip(examples["answers"], examples["question"])
+        ]
+
+        encoding = tokenizer(
+            question_option,
+            context,
+            add_special_tokens=True,
+            max_length=max_seq_len,
+            return_token_type_ids=False,
+            padding="max_length",
+            truncation=True,
+            return_attention_mask=True,
+            return_tensors="pt",
+        )
+
+        labels = [answer for answer in examples["correct"]]
+
+        return {
+            "input_ids": encoding["input_ids"].tolist(),
+            "attention_mask": encoding["attention_mask"].tolist(),
+            "label": labels,
+        }
+
+
+    @staticmethod
+    def flatten(examples):
+        label_map = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4}
+
+        contexts = [[article] * 5 for article in examples["text"]] 
+
+        options = []
+        for opta, optb, optc, optd, opte in zip(
+            examples["A"],
+            examples["B"],
+            examples["C"],
+            examples["D"],
+            examples["E"],
+        ):
+            options.append([opta])
+            options.append([optb])
+            options.append([optc])
+            options.append([optd])
+            options.append([opte])
+
+        questions = [[question] * 5 for question in examples["question"]]
+
+        corrects = []
+        for answer in examples["answer"]:
+            ans_idx = label_map.get(answer, -1)
+
+            for idx in range(5):
+                if ans_idx == idx:
+                    corrects.append([1])
+                else:
+                    corrects.append([0])
+
+        contexts = sum(contexts, [])
+        options = sum(options, [])
+        questions = sum(questions, [])
+        corrects = sum(corrects, [])
+
+        return {
+            "text": contexts,
+            "question": questions,
+            "answers": options,
+            "correct": corrects  
+        }
+
+
     def setup(self, stage=None):
 
-        # preprocess
-        preprocessor = partial(self.preprocess, self.tokenizer, self.max_seq_len)
+        if self.version == "flat":
+            flatten_preprocessor = partial(self.flatten)
+            binary_preprocessor = partial(self.preprocess_binary, self.tokenizer, self.max_seq_len)
 
-        for split in ["train", "validation", "test"]:
-            self.dataset[split] = self.dataset[split].map(
-                preprocessor,
-                num_proc=self.num_proc,
-                batched=True,
-            )
+            for split in ["train", "validation", "test"]:
+                print("BEFTORE SANITY")
+                print(self.dataset[split][0])
 
-            self.dataset[split].set_format(
-                type="torch", columns=["input_ids", "attention_mask", "label"]
-            )
+                self.dataset[split] = self.dataset[split].map(
+                    flatten_preprocessor,
+                    num_proc=self.num_proc,
+                    remove_columns=["A", "B", "C", "D", "E", "reason", "answer"],
+                    batched=True,
+                )
+                # print("TERMINO FLAT")
+                print("MY SANITY")
+                print(self.dataset[split][0])
+                print(self.dataset[split][1])
+                print(self.dataset[split][2])
+                print(self.dataset[split][3])
+                print(self.dataset[split][4])
+                # print("MY SANITY")
+
+                print("LENGTH")
+                print(len(self.dataset[split]))
+
+                self.dataset[split] = self.dataset[split].map(
+                    binary_preprocessor,
+                    num_proc=self.num_proc,
+                    batched=True,
+                )
+
+                self.dataset[split].set_format(
+                    type="torch", columns=["input_ids", "attention_mask", "label"]
+                )
+            
+
+        else:
+            # preprocess        
+            preprocessor = partial(self.preprocess, self.tokenizer, self.max_seq_len)
+
+            for split in ["train", "validation", "test"]:
+                self.dataset[split] = self.dataset[split].map(
+                    preprocessor,
+                    num_proc=self.num_proc,
+                    batched=True,
+                )
+
+                self.dataset[split].set_format(
+                    type="torch", columns=["input_ids", "attention_mask", "label"]
+                )
 
     def train_dataloader(self):
         return DataLoader(

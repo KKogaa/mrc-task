@@ -6,6 +6,7 @@ from transformers import BertTokenizerFast
 from functools import partial
 import datasets
 from transformers import AutoTokenizer
+from googletrans import Translator
 
 
 class QuailDataModule(pl.LightningDataModule):
@@ -18,6 +19,8 @@ class QuailDataModule(pl.LightningDataModule):
         max_seq_len,
         num_workers,
         num_proc,
+        version,
+        num_choices,
     ):
         super().__init__()
         self.model_name = model_name
@@ -30,6 +33,8 @@ class QuailDataModule(pl.LightningDataModule):
         # self.tokenizer = BertTokenizerFast.from_pretrained(self.model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
         self.dataset = None
+        self.version = version
+        self.num_choices = num_choices
 
     @staticmethod
     def preprocess(tokenizer, max_seq_len, examples):
@@ -79,6 +84,78 @@ class QuailDataModule(pl.LightningDataModule):
             "label": labels,
         }
 
+
+    @staticmethod
+    def preprocess_binary(tokenizer, max_seq_len, examples):
+
+        context = [article for article in examples["context"]]
+        question_option = [
+            f"{question} {option}"
+            for option, question in zip(examples["answers"], examples["question"])
+        ]
+
+        encoding = tokenizer(
+            context,
+            question_option,
+            add_special_tokens=True,
+            max_length=max_seq_len,
+            return_token_type_ids=False,
+            padding="max_length",
+            truncation=True,
+            return_attention_mask=True,
+            return_tensors="pt",
+        )
+
+        labels = [answer for answer in examples["correct"]]
+
+        return {
+            "input_ids": encoding["input_ids"].tolist(),
+            "attention_mask": encoding["attention_mask"].tolist(),
+            "label": labels,
+        }
+
+    @staticmethod
+    def translate(translator, example):
+        question = translator.translate(example["question"], dest="es").text
+        context = translator.translate(example["context"], dest="es").text
+
+        return {
+            "question": question,
+            "context": context,
+        }
+
+    @staticmethod
+    def flatten(examples):
+        contexts = [[article] * 4 for article in examples["context"]] 
+        options = [[option for option in options] for options in examples["answers"]]
+        questions = [[question] * 4 for question in examples["question"]]
+        correct_answer_ids = [[correct] * 4 for correct in examples["correct_answer_id"]]
+        # corrects = [[option for option in options] for options, correct_id in zip(examples["answers"], examples["correct_answer_id"])]
+
+        corrects = []
+        for opts, correct_id in zip(examples["answers"], examples["correct_answer_id"]):
+            for idx, option in enumerate(opts):
+                if idx == correct_id:
+                    corrects.append([1])
+                else:
+                    corrects.append([0])
+
+
+        contexts = sum(contexts, [])
+        options = sum(options, [])
+        questions = sum(questions, [])
+        correct_answer_ids = sum(correct_answer_ids, [])
+        corrects = sum(corrects, [])
+
+        return {
+            "context": contexts,
+            "question": questions,
+            "answers": options,
+            "correct_answer_id": correct_answer_ids,
+            "correct": corrects  
+        }
+    
+
     def get_dataset(self):
         return self.dataset
 
@@ -92,18 +169,47 @@ class QuailDataModule(pl.LightningDataModule):
         self.dataset = datasets.load_dataset(self.dataset_name, self.task_name)
 
         # preprocess
-        preprocessor = partial(self.preprocess, self.tokenizer, self.max_seq_len)
+        if self.version == "en":
+            preprocessor = partial(self.preprocess, self.tokenizer, self.max_seq_len)
 
-        for split in ["train", "validation", "challenge"]:
-            self.dataset[split] = self.dataset[split].map(
-                preprocessor,
-                num_proc=self.num_proc,
-                batched=True,
-            )
+            for split in ["train", "validation", "challenge"]:
+                self.dataset[split] = self.dataset[split].map(
+                    preprocessor,
+                    num_proc=self.num_proc,
+                    batched=True,
+                )
 
-            self.dataset[split].set_format(
-                type="torch", columns=["input_ids", "attention_mask", "label"]
-            )
+                self.dataset[split].set_format(
+                    type="torch", columns=["input_ids", "attention_mask", "label"]
+                )
+
+        if self.version == "es":
+            translator = Translator()
+            preprocessor = partial(self.translate, translator)
+            for split in ["train", "validation", "challenge"]:
+                self.dataset[split] = self.dataset[split].map(
+                    preprocessor,
+                )
+
+        if self.version == "flat":
+            flatten_preprocessor = partial(self.flatten)
+            binary_preprocessor = partial(self.preprocess_binary, self.tokenizer, self.max_seq_len)
+
+            for split in ["train", "validation", "challenge"]:
+                self.dataset[split] = self.dataset[split].map(
+                    flatten_preprocessor,
+                    remove_columns=["id", "context_id", "question_id", "domain", "metadata", "question_type"],
+                    num_proc=self.num_proc,
+                    batched=True,
+                )
+                self.dataset[split] = self.dataset[split].map(
+                    binary_preprocessor,
+                    num_proc=self.num_proc,
+                    batched=True,
+                )
+                self.dataset[split].set_format(
+                    type="torch", columns=["input_ids", "attention_mask", "label"]
+                )
 
     def train_dataloader(self):
         return DataLoader(
