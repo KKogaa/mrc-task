@@ -104,12 +104,10 @@ class RecoresDataModule(pl.LightningDataModule):
     @staticmethod
     def preprocess_binary(tokenizer, max_seq_len, examples):
 
-        label_map = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4}
-
         context = [article for article in examples["text"]]
         question_option = [
             f"{question} {option}"
-            for option, question in zip(examples["answers"], examples["question"])
+            for option, question in zip(examples["answer"], examples["question"])
         ]
 
         encoding = tokenizer(
@@ -132,12 +130,11 @@ class RecoresDataModule(pl.LightningDataModule):
             "label": labels,
         }
 
-
     @staticmethod
     def flatten(examples):
         label_map = {"A": 0, "B": 1, "C": 2, "D": 3, "E": 4}
 
-        contexts = [[article] * 5 for article in examples["text"]] 
+        contexts = [[article] * 5 for article in examples["text"]]
 
         options = []
         for opta, optb, optc, optd, opte in zip(
@@ -174,37 +171,25 @@ class RecoresDataModule(pl.LightningDataModule):
             "text": contexts,
             "question": questions,
             "answers": options,
-            "correct": corrects  
+            "correct": corrects,
         }
-
 
     def setup(self, stage=None):
 
         if self.version == "flat":
-            flatten_preprocessor = partial(self.flatten)
-            binary_preprocessor = partial(self.preprocess_binary, self.tokenizer, self.max_seq_len)
+            # flatten_preprocessor = partial(self.flatten)
+            binary_preprocessor = partial(
+                self.preprocess_binary, self.tokenizer, self.max_seq_len
+            )
 
             for split in ["train", "validation", "test"]:
-                print("BEFTORE SANITY")
-                print(self.dataset[split][0])
 
-                self.dataset[split] = self.dataset[split].map(
-                    flatten_preprocessor,
-                    num_proc=self.num_proc,
-                    remove_columns=["A", "B", "C", "D", "E", "reason", "answer"],
-                    batched=True,
-                )
-                # print("TERMINO FLAT")
-                print("MY SANITY")
-                print(self.dataset[split][0])
-                print(self.dataset[split][1])
-                print(self.dataset[split][2])
-                print(self.dataset[split][3])
-                print(self.dataset[split][4])
-                # print("MY SANITY")
-
-                print("LENGTH")
-                print(len(self.dataset[split]))
+                # self.dataset[split] = self.dataset[split].map(
+                #     flatten_preprocessor,
+                #     num_proc=self.num_proc,
+                #     remove_columns=["A", "B", "C", "D", "E", "reason", "answer"],
+                #     batched=True,
+                # )
 
                 self.dataset[split] = self.dataset[split].map(
                     binary_preprocessor,
@@ -215,10 +200,9 @@ class RecoresDataModule(pl.LightningDataModule):
                 self.dataset[split].set_format(
                     type="torch", columns=["input_ids", "attention_mask", "label"]
                 )
-            
 
         else:
-            # preprocess        
+            # preprocess
             preprocessor = partial(self.preprocess, self.tokenizer, self.max_seq_len)
 
             for split in ["train", "validation", "test"]:

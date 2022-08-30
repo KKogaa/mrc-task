@@ -84,7 +84,6 @@ class QuailDataModule(pl.LightningDataModule):
             "label": labels,
         }
 
-
     @staticmethod
     def preprocess_binary(tokenizer, max_seq_len, examples):
 
@@ -126,10 +125,12 @@ class QuailDataModule(pl.LightningDataModule):
 
     @staticmethod
     def flatten(examples):
-        contexts = [[article] * 4 for article in examples["context"]] 
+        contexts = [[article] * 4 for article in examples["context"]]
         options = [[option for option in options] for options in examples["answers"]]
         questions = [[question] * 4 for question in examples["question"]]
-        correct_answer_ids = [[correct] * 4 for correct in examples["correct_answer_id"]]
+        correct_answer_ids = [
+            [correct] * 4 for correct in examples["correct_answer_id"]
+        ]
         # corrects = [[option for option in options] for options, correct_id in zip(examples["answers"], examples["correct_answer_id"])]
 
         corrects = []
@@ -139,7 +140,6 @@ class QuailDataModule(pl.LightningDataModule):
                     corrects.append([1])
                 else:
                     corrects.append([0])
-
 
         contexts = sum(contexts, [])
         options = sum(options, [])
@@ -152,9 +152,8 @@ class QuailDataModule(pl.LightningDataModule):
             "question": questions,
             "answers": options,
             "correct_answer_id": correct_answer_ids,
-            "correct": corrects  
+            "correct": corrects,
         }
-    
 
     def get_dataset(self):
         return self.dataset
@@ -193,12 +192,21 @@ class QuailDataModule(pl.LightningDataModule):
 
         if self.version == "flat":
             flatten_preprocessor = partial(self.flatten)
-            binary_preprocessor = partial(self.preprocess_binary, self.tokenizer, self.max_seq_len)
+            binary_preprocessor = partial(
+                self.preprocess_binary, self.tokenizer, self.max_seq_len
+            )
 
             for split in ["train", "validation", "challenge"]:
                 self.dataset[split] = self.dataset[split].map(
                     flatten_preprocessor,
-                    remove_columns=["id", "context_id", "question_id", "domain", "metadata", "question_type"],
+                    remove_columns=[
+                        "id",
+                        "context_id",
+                        "question_id",
+                        "domain",
+                        "metadata",
+                        "question_type",
+                    ],
                     num_proc=self.num_proc,
                     batched=True,
                 )

@@ -14,7 +14,6 @@ from transformers import (
 class TEST(pl.LightningModule):
     def __init__(self, *args, **kwargs):
         super().__init__()
-        # self.bert = BertModel.from_pretrained(kwargs["model_name"], return_dict=True)
         self.bert = AutoModel.from_pretrained(kwargs["model_name"], return_dict=True)
         self.fc1 = nn.Linear(self.bert.config.hidden_size, 1)
 
@@ -24,9 +23,6 @@ class TEST(pl.LightningModule):
         self.criterion = nn.CrossEntropyLoss()
 
         self.save_hyperparameters()
-
-        # self.n_training_steps = kwargs['n_training_steps']
-        # self.n_warmup_steps = kwargs['n_warmup_steps']
 
     def forward(self, input_ids, attention_mask, labels=None):
         bert_output = self.bert(input_ids, attention_mask=attention_mask)

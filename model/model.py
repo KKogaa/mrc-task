@@ -13,7 +13,6 @@ from transformers import (
 class BERT(pl.LightningModule):
     def __init__(self, *args, **kwargs):
         super().__init__()
-        # self.bert = BertModel.from_pretrained(kwargs["model_name"], return_dict=True)
         self.bert = AutoModel.from_pretrained(kwargs["model_name"], return_dict=True)
         self.fc1 = nn.Linear(self.bert.config.hidden_size, 1)
 
@@ -23,9 +22,6 @@ class BERT(pl.LightningModule):
         self.criterion = nn.BCEWithLogitsLoss()
 
         self.save_hyperparameters()
-
-        # self.n_training_steps = kwargs['n_training_steps']
-        # self.n_warmup_steps = kwargs['n_warmup_steps']
 
         self.positives = 0
         self.negatives = 0
@@ -88,21 +84,29 @@ class BERT(pl.LightningModule):
         )
 
         prob = torch.sigmoid(outputs)
-        output = {"loss": loss, "prob": prob.flatten(), "target": labels.int()}
-
-        return output
-
-    def test_step_end(self, outputs):
-        predictions = outputs["prob"].detach().cpu()
-        targets = outputs["target"].detach().cpu()
-
-        max_prediction = torch.argmax(predictions.flatten())
-        max_label = torch.argmax(targets)
+        max_prediction = torch.argmax(prob.flatten())
+        max_label = torch.argmax(labels)
 
         if torch.equal(max_prediction, max_label):
             self.positives = self.positives + 1
         else:
             self.negatives = self.negatives + 1
+
+        # output = {"loss": loss, "prob": prob.flatten(), "target": labels.int()}
+
+        return loss
+
+    # def test_step_end(self, outputs):
+    #     predictions = outputs["prob"].detach().cpu()
+    #     targets = outputs["target"].detach().cpu()
+
+    #     max_prediction = torch.argmax(predictions.flatten())
+    #     max_label = torch.argmax(targets)
+
+    #     if torch.equal(max_prediction, max_label):
+    #         self.positives = self.positives + 1
+    #     else:
+    #         self.negatives = self.negatives + 1
 
     def test_epoch_end(self, outputs):
         accuracy = self.positives / (self.positives + self.negatives)
