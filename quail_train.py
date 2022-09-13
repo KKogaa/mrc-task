@@ -12,7 +12,7 @@ from model.model import BERT
 from model.Duma import DUMA
 
 
-def train(
+def train_duma(
     config={"learning_rate": 1e-5, "batch_size": 16, "epochs": 10},
 ):
     with wandb.init(
@@ -98,6 +98,103 @@ def train(
         trainer = pl.Trainer(
             callbacks=[early_stopping_callback, checkpoint_callback],
             max_epochs=config.epochs,
+            gpus=[0, 1],
+            strategy="dp",
+            logger=logger,
+        )
+
+        # load best model
+        trainer.test(model=model, datamodule=data_module)
+
+        torch.cuda.empty_cache()
+
+
+def train_normal(
+    config={"learning_rate": 1e-5, "batch_size": 16, "epochs": 10},
+):
+    with wandb.init(
+        project=project, entity=entity, job_type="train", config=config
+    ) as run:
+
+        # Extract the config object associated with the run
+        config = run.config
+
+        # Construct our LightningModule with the learning rate from the config object
+        model = TEST(
+            learning_rate=config.learning_rate,
+            batch_size=config.batch_size,
+            model_name=config.model_name,
+            num_choices=config.num_choices,
+            num_epochs=config.epochs,
+            gradient_accumulation_steps=config.accumulate,
+            warmup_proportion=config.warmup_proportion,
+        )
+
+        # This logger is used when we call self.log inside the LightningModule
+        # name_string = f"{config.batch_size}-{config.learning_rate}"
+        logger = pl.loggers.WandbLogger(experiment=run, log_model=True)
+
+        # build data module
+        data_module = QuailDataModule(
+            model_name=config.model_name,
+            dataset_name=config.dataset_name,
+            task_name=config.task_name,
+            batch_size=config.batch_size,
+            max_seq_len=config.max_token_count,
+            num_workers=4,
+            num_proc=8,
+            version=config.version,
+            num_choices=config.num_choices,
+        )
+
+        # Construct a Trainer object with the W&B logger we created and epoch set by the config object
+        checkpoint_callback = ModelCheckpoint(
+            save_top_k=1, verbose=True, monitor="val_accuracy_epoch", mode="min"
+        )
+        early_stopping_callback = EarlyStopping(monitor="val_accuracy_epoch", patience=3)
+
+        trainer = pl.Trainer(
+            callbacks=[early_stopping_callback, checkpoint_callback],
+            max_epochs=config.epochs,
+            gpus=[0, 1, 2, 3],
+            strategy="dp",
+            logger=logger,
+            accumulate_grad_batches=config.accumulate,
+        )
+
+        # Execute training
+        trainer.fit(model, data_module)
+
+        torch.cuda.empty_cache()
+
+        best_path = trainer.checkpoint_callback.best_model_path
+
+        data_module = QuailDataModule(
+            model_name=config.model_name,
+            dataset_name=config.dataset_name,
+            task_name=config.task_name,
+            batch_size=config.batch_size,
+            max_seq_len=config.max_token_count,
+            num_workers=4,
+            num_proc=8,
+            version=config.version,
+            num_choices=config.num_choices,
+        )
+
+        model = TEST.load_from_checkpoint(
+            best_path,
+            learning_rate=config.learning_rate,
+            batch_size=config.batch_size,
+            model_name=config.model_name,
+            num_choices=config.num_choices,
+            num_epochs=config.epochs,
+            gradient_accumulation_steps=config.accumulate,
+            warmup_proportion=config.warmup_proportion,
+        )
+
+        trainer = pl.Trainer(
+            callbacks=[early_stopping_callback, checkpoint_callback],
+            max_epochs=config.epochs,
             gpus=[0, 1, 2, 3],
             strategy="dp",
             logger=logger,
@@ -107,6 +204,9 @@ def train(
         trainer.test(model=model, datamodule=data_module)
 
         torch.cuda.empty_cache()
+
+
+
 
 def test(
     config={"learning_rate": 1e-5, "batch_size": 16, "epochs": 10},
@@ -127,12 +227,12 @@ def test(
             max_seq_len=config.max_token_count,
             num_workers=4,
             num_proc=8,
-            version="en",
+            version="flat",
             num_choices=config.num_choices,
         )
 
-        model = DUMA.load_from_checkpoint(
-            "/home/akenichi/mrc-task/quail_v7/6yh7rhav/checkpoints/epoch=1-step=10246.ckpt",
+        model = TEST.load_from_checkpoint(
+            config.checkpoint,
             learning_rate=config.learning_rate,
             batch_size=config.batch_size,
             model_name=config.model_name,
@@ -159,9 +259,106 @@ def test(
 
         torch.cuda.empty_cache()
 
+def train_from_checkpoint(
+    config={"learning_rate": 1e-5, "batch_size": 16, "epochs": 10},
+):
+    with wandb.init(
+        project=project, entity=entity, job_type="train", config=config
+    ) as run:
+
+        # Extract the config object associated with the run
+        config = run.config
+
+        # Construct our LightningModule with the learning rate from the config object
+        model = TEST.load_from_checkpoint(
+            config.checkpoint,
+            learning_rate=config.learning_rate,
+            batch_size=config.batch_size,
+            model_name=config.model_name,
+            num_choices=config.num_choices,
+            num_epochs=config.epochs,
+            gradient_accumulation_steps=config.accumulate,
+            warmup_proportion=config.warmup_proportion,
+        )
+
+        # This logger is used when we call self.log inside the LightningModule
+        # name_string = f"{config.batch_size}-{config.learning_rate}"
+        logger = pl.loggers.WandbLogger(experiment=run, log_model=True)
+
+        # build data module
+        data_module = QuailDataModule(
+            model_name=config.model_name,
+            dataset_name=config.dataset_name,
+            task_name=config.task_name,
+            batch_size=config.batch_size,
+            max_seq_len=config.max_token_count,
+            num_workers=4,
+            num_proc=8,
+            version=config.version,
+            num_choices=config.num_choices,
+        )
+
+        # Construct a Trainer object with the W&B logger we created and epoch set by the config object
+        checkpoint_callback = ModelCheckpoint(
+            save_top_k=1, verbose=True, monitor="val_loss", mode="min"
+        )
+        early_stopping_callback = EarlyStopping(monitor="val_loss", patience=3)
+
+        trainer = pl.Trainer(
+            callbacks=[early_stopping_callback, checkpoint_callback],
+            max_epochs=config.epochs,
+            gpus=[0, 1],
+            strategy="dp",
+            logger=logger,
+            accumulate_grad_batches=config.accumulate,
+        )
+
+        # Execute training
+        trainer.fit(model, data_module)
+
+        torch.cuda.empty_cache()
+
+        best_path = trainer.checkpoint_callback.best_model_path
+
+        data_module = QuailDataModule(
+            model_name=config.model_name,
+            dataset_name=config.dataset_name,
+            task_name=config.task_name,
+            batch_size=config.batch_size,
+            max_seq_len=config.max_token_count,
+            num_workers=4,
+            num_proc=8,
+            version=config.version,
+            num_choices=config.num_choices,
+        )
+
+        model = TEST.load_from_checkpoint(
+            best_path,
+            learning_rate=config.learning_rate,
+            batch_size=config.batch_size,
+            model_name=config.model_name,
+            num_choices=config.num_choices,
+            num_epochs=config.epochs,
+            gradient_accumulation_steps=config.accumulate,
+            warmup_proportion=config.warmup_proportion,
+        )
+
+        trainer = pl.Trainer(
+            callbacks=[early_stopping_callback, checkpoint_callback],
+            max_epochs=config.epochs,
+            gpus=[0, 1],
+            strategy="dp",
+            logger=logger,
+        )
+
+        # load best model
+        trainer.test(model=model, datamodule=data_module)
+
+        torch.cuda.empty_cache()
+
 if __name__ == "__main__":
 
-    project = "quail_v8"
+    project = "quail_multi_mbert_v1"
     entity = None
     name = None
     sweep_config = {
@@ -173,16 +370,17 @@ if __name__ == "__main__":
         # Paramters and parameter values we are sweeping across
         "parameters": {
             "learning_rate": {"values": [1e-5]},
-            "batch_size": {"values": [2, 4]},
-            "epochs": {"values": [20]},
+            "batch_size": {"values": [4]},
+            "epochs": {"values": [10]},
             "max_token_count": {"values": [512]},
             "model_name": {"values": ["bert-base-multilingual-cased"]},
             "dataset_name": {"values": ["quail"]},
             "task_name": {"values": [None]},
             "num_choices": {"values": [4]},
             "version": {"values": [None]},
-            "accumulate": {"values": [2, 4]},
+            "accumulate": {"values": [4]},
             "warmup_proportion": {"values": [0.1]},
+            "checkpoint": {"values": [None]},
         },
     }
     sweep_id = wandb.sweep(
@@ -190,4 +388,4 @@ if __name__ == "__main__":
         project=project,
         entity=entity,
     )
-    wandb.agent(sweep_id, function=train, count=4)
+    wandb.agent(sweep_id, function=train_normal, count=1)

@@ -161,3 +161,10 @@ recores_v7/*
 recores_v8/*
 roberta_optimized/*
 mbert-transfer-learning/*
+quail_flat_mbert_v1/*
+quail_multi_mbert_v1/*
+mbert-transfer-learning-adapter/*
+adapter_training/wandb/*
+adapter_training/eval_output/*
+adapter_training/run1/*
+adapter_training/training_output/*

@@ -51,8 +51,8 @@ class QuailDataModule(pl.LightningDataModule):
         question_option = sum(question_option, [])
 
         encoding = tokenizer(
-            context,
             question_option,
+            context,
             add_special_tokens=True,
             max_length=max_seq_len,
             return_token_type_ids=False,
@@ -94,8 +94,8 @@ class QuailDataModule(pl.LightningDataModule):
         ]
 
         encoding = tokenizer(
-            context,
             question_option,
+            context,
             add_special_tokens=True,
             max_length=max_seq_len,
             return_token_type_ids=False,
@@ -167,29 +167,6 @@ class QuailDataModule(pl.LightningDataModule):
     def setup(self, stage=None):
         self.dataset = datasets.load_dataset(self.dataset_name, self.task_name)
 
-        # preprocess
-        if self.version == "en":
-            preprocessor = partial(self.preprocess, self.tokenizer, self.max_seq_len)
-
-            for split in ["train", "validation", "challenge"]:
-                self.dataset[split] = self.dataset[split].map(
-                    preprocessor,
-                    num_proc=self.num_proc,
-                    batched=True,
-                )
-
-                self.dataset[split].set_format(
-                    type="torch", columns=["input_ids", "attention_mask", "label"]
-                )
-
-        if self.version == "es":
-            translator = Translator()
-            preprocessor = partial(self.translate, translator)
-            for split in ["train", "validation", "challenge"]:
-                self.dataset[split] = self.dataset[split].map(
-                    preprocessor,
-                )
-
         if self.version == "flat":
             flatten_preprocessor = partial(self.flatten)
             binary_preprocessor = partial(
@@ -218,6 +195,20 @@ class QuailDataModule(pl.LightningDataModule):
                 self.dataset[split].set_format(
                     type="torch", columns=["input_ids", "attention_mask", "label"]
                 )
+        else:
+            preprocessor = partial(self.preprocess, self.tokenizer, self.max_seq_len)
+
+            for split in ["train", "validation", "challenge"]:
+                self.dataset[split] = self.dataset[split].map(
+                    preprocessor,
+                    num_proc=self.num_proc,
+                    batched=True,
+                )
+
+                self.dataset[split].set_format(
+                    type="torch", columns=["input_ids", "attention_mask", "label"]
+                )
+
 
     def train_dataloader(self):
         return DataLoader(
@@ -237,9 +228,17 @@ class QuailDataModule(pl.LightningDataModule):
         )
 
     def test_dataloader(self):
-        return DataLoader(
-            self.dataset["challenge"],
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            drop_last=True,
-        )
+        if self.version == "flat":
+            return DataLoader(
+                self.dataset["challenge"],
+                batch_size=self.num_choices,
+                num_workers=self.num_workers,
+                drop_last=True,
+            )
+        else:
+            return DataLoader(
+                self.dataset["challenge"],
+                batch_size=self.batch_size,
+                num_workers=self.num_workers,
+                drop_last=True,
+            )

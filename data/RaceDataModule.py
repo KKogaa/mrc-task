@@ -18,6 +18,8 @@ class RaceDataModule(pl.LightningDataModule):
         max_seq_len,
         num_workers,
         num_proc,
+        num_choices,
+        version,
     ):
         super().__init__()
         self.model_name = model_name
@@ -30,6 +32,8 @@ class RaceDataModule(pl.LightningDataModule):
         # self.tokenizer = BertTokenizerFast.from_pretrained(self.model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
         self.dataset = None
+        self.num_choices = num_choices
+        self.version = version
 
     @staticmethod
     def preprocess(tokenizer, max_seq_len, examples):
@@ -46,8 +50,8 @@ class RaceDataModule(pl.LightningDataModule):
         question_option = sum(question_option, [])
 
         encoding = tokenizer(
-            context,
             question_option,
+            context,
             add_special_tokens=True,
             max_length=max_seq_len,
             return_token_type_ids=False,
@@ -78,6 +82,67 @@ class RaceDataModule(pl.LightningDataModule):
             "label": labels,
         }
 
+
+    @staticmethod
+    def preprocess_binary(tokenizer, max_seq_len, examples):
+
+        context = [article for article in examples["article"]]
+        question_option = [
+            f"{question} {option}"
+            for option, question in zip(examples["options"], examples["question"])
+        ]
+
+        encoding = tokenizer(
+            question_option,
+            context,
+            add_special_tokens=True,
+            max_length=max_seq_len,
+            return_token_type_ids=False,
+            padding="max_length",
+            truncation=True,
+            return_attention_mask=True,
+            return_tensors="pt",
+        )
+
+        labels = [answer for answer in examples["correct"]]
+
+        return {
+            "input_ids": encoding["input_ids"].tolist(),
+            "attention_mask": encoding["attention_mask"].tolist(),
+            "label": labels,
+        }
+
+
+    @staticmethod
+    def flatten(examples):
+        contexts = [[article] * 4 for article in examples["article"]]
+        options = [[option for option in options] for options in examples["options"]]
+        questions = [[question] * 4 for question in examples["question"]]
+
+        corrects = []
+        label_map = {"A": 0, "B": 1, "C": 2, "D": 3}
+        for c_answer in examples["answer"]:
+            temp = []
+            c_answer_idx = label_map.get(c_answer, -1)
+            for idx in range(4):
+                if idx == c_answer_idx:
+                    temp.append(1)
+                else:
+                    temp.append(0)
+            corrects.append(temp)
+
+        contexts = sum(contexts, [])
+        options = sum(options, [])
+        questions = sum(questions, [])
+        corrects = sum(corrects, [])
+
+        return {
+            "article": contexts,
+            "question": questions,
+            "options": options,
+            "correct": corrects,
+        }
+
     def get_dataset(self):
         return self.dataset
 
@@ -93,17 +158,43 @@ class RaceDataModule(pl.LightningDataModule):
         # preprocess
         preprocessor = partial(self.preprocess, self.tokenizer, self.max_seq_len)
 
-        for split in ["train", "validation", "test"]:
-            self.dataset[split] = self.dataset[split].map(
-                preprocessor,
-                remove_columns=["example_id"],
-                num_proc=self.num_proc,
-                batched=True,
+        if self.version == "flat":
+            print(self.dataset)
+            flatten_preprocessor = partial(self.flatten)
+            binary_preprocessor = partial(
+                self.preprocess_binary, self.tokenizer, self.max_seq_len
             )
 
-            self.dataset[split].set_format(
-                type="torch", columns=["input_ids", "attention_mask", "label"]
-            )
+            for split in ["train", "validation", "test"]:
+                self.dataset[split] = self.dataset[split].map(
+                    flatten_preprocessor,
+                    remove_columns=[
+                        "example_id",
+                        "answer",
+                    ],
+                    num_proc=self.num_proc,
+                    batched=True,
+                )
+                self.dataset[split] = self.dataset[split].map(
+                    binary_preprocessor,
+                    num_proc=self.num_proc,
+                    batched=True,
+                )
+                self.dataset[split].set_format(
+                    type="torch", columns=["input_ids", "attention_mask", "label"]
+                )
+        else:
+            for split in ["train", "validation", "test"]:
+                self.dataset[split] = self.dataset[split].map(
+                    preprocessor,
+                    remove_columns=["example_id"],
+                    num_proc=self.num_proc,
+                    batched=True,
+                )
+
+                self.dataset[split].set_format(
+                    type="torch", columns=["input_ids", "attention_mask", "label"]
+                )
 
     def train_dataloader(self):
         return DataLoader(
@@ -123,9 +214,17 @@ class RaceDataModule(pl.LightningDataModule):
         )
 
     def test_dataloader(self):
-        return DataLoader(
-            self.dataset["test"],
-            batch_size=self.batch_size,
-            num_workers=self.num_workers,
-            drop_last=True,
-        )
+        if self.version == "flat":
+            return DataLoader(
+                self.dataset["test"],
+                batch_size=self.num_choices,
+                num_workers=self.num_workers,
+                drop_last=True,
+            )
+        else:
+            return DataLoader(
+                self.dataset["test"],
+                batch_size=self.batch_size,
+                num_workers=self.num_workers,
+                drop_last=True,
+            )

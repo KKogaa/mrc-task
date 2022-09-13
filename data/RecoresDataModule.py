@@ -69,7 +69,7 @@ class RecoresDataModule(pl.LightningDataModule):
 
         encoding = tokenizer(
             question_option,
-            context,
+            context, 
             add_special_tokens=True,
             max_length=max_seq_len,
             return_token_type_ids=False,
